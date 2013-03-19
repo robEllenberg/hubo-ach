@@ -622,10 +622,53 @@ void getEncAllSlow(hubo_state_t *s, hubo_param_t *h, struct can_frame *f)
     }
 }
 
+///> Requests all known encoders and records to hubo_state
+void getEncAll(struct hubo_state *s, struct hubo_param *h, struct can_frame *f) 
+{
+    int i = 0;
+    int canChan = 0;
+    //TODO: Ensure i doesn't overflow length of joints, maybe compile-time check?
+    //Loop only over known joints and use stored channel / jmc information to request
+    for( i = 0; i < HUBO_JOINT_COUNT; i++ ) {
+        hGetEncValue(i, 0x00, h, f);
+        readCan(getSocket(h,i), f, HUBO_CAN_TIMEOUT_DEFAULT);
+        decodeFrame(s, h, f);
+        //FIXME: Is bitwise or appropriate here?
+        if(RF1 == i | RF2 == i | RF3 == i | RF4 == i | RF5 == i | 
+                LF1 == i | LF2 == i | LF3 == i | LF4 == i | LF5 == i) { 	
+            hGetEncValue(i, 0x01, h, f);
+            readCan(getSocket(h,i), f, HUBO_CAN_TIMEOUT_DEFAULT);
+            decodeFrame(s, h, f);
+        }
+    }
+}
+
+///> Requests all known board statuses and stores to hubo state
+void getBoardStatusAll(struct hubo_state *s, struct hubo_param *h, struct can_frame *f)
+{
+    int i = 0;
+    int canChan = 0;
+    //Loop only over known joints and use stored channel / jmc information to request
+    for( i = 0; i < HUBO_JOINT_COUNT; i++ )
+    {
+        hGetBoardStatus(i, s, h, f);
+        readCan(getSocket(h,i), f, HUBO_CAN_TIMEOUT_DEFAULT);
+        decodeFrame(s, h, f);
+    }
+}
 
 
-
-
+///>  Requests all known motor currents and records to hubo_state
+void getCurrentAll(struct hubo_state *s, struct hubo_param *h, struct can_frame *f) {
+    int i = 0;
+    int canChan = 0;
+    for( i = 0; i < HUBO_JOINT_COUNT; i++ )
+    {
+        hGetCurrentValue(i, h, f);
+        readCan(getSocket(h,i), f, HUBO_CAN_TIMEOUT_DEFAULT);
+        decodeFrame(s, h, f);
+    }
+}
 
 void getBoardStatusAllSlow(hubo_state_t *s, hubo_param_t *h, struct can_frame *f)
 {
