@@ -26,13 +26,51 @@ from optparse import OptionParser
 #import select
 
 #from openravepy import *
-from numpy import pi, array
+from numpy import pi
 import numpy as _np
 import openhubo
 
 skip = 100
 kipi = 0
 skiptemp = 0.0
+
+
+def make_maps(robot):
+    ind=openhubo.make_name_to_index_converter(robot)
+
+    ha_from_oh={}
+    ha_from_oh.setdefault(ind('RSP'),ha.RSP)
+    ha_from_oh.setdefault(ind('RSR'),ha.RSR)
+    ha_from_oh.setdefault(ind('RSY'),ha.RSY)
+    ha_from_oh.setdefault(ind('REP'),ha.REB)
+    ha_from_oh.setdefault(ind('RWY'),ha.RWY)
+    ha_from_oh.setdefault(ind('RWP'),ha.RWP)
+
+    ha_from_oh.setdefault(ind('LSP'),ha.LSP)
+    ha_from_oh.setdefault(ind('LSR'),ha.LSR)
+    ha_from_oh.setdefault(ind('LSY'),ha.LSY)
+    ha_from_oh.setdefault(ind('LEP'),ha.LEB)
+    ha_from_oh.setdefault(ind('LWY'),ha.LWY)
+    ha_from_oh.setdefault(ind('LWP'),ha.LWP)
+
+    ha_from_oh.setdefault(ind('HPY'),ha.WST)
+
+    ha_from_oh.setdefault(ind('RHY'),ha.RHY)
+    ha_from_oh.setdefault(ind('RHR'),ha.RHR)
+    ha_from_oh.setdefault(ind('RHP'),ha.RHP)
+    ha_from_oh.setdefault(ind('RKP'),ha.RKN)
+    ha_from_oh.setdefault(ind('RAP'),ha.RAP)
+    ha_from_oh.setdefault(ind('RAR'),ha.RAR)
+
+    ha_from_oh.setdefault(ind('LHY'),ha.LHY)
+    ha_from_oh.setdefault(ind('LHR'),ha.LHR)
+    ha_from_oh.setdefault(ind('LHP'),ha.LHP)
+    ha_from_oh.setdefault(ind('LKP'),ha.LKN)
+    ha_from_oh.setdefault(ind('LAP'),ha.LAP)
+    ha_from_oh.setdefault(ind('LAR'),ha.LAR)
+
+    oh_from_ha = {v:k for k, v in ha_from_oh.items()}
+    return (ha_from_oh,oh_from_ha)
 
 
 class Timer(object):
@@ -61,105 +99,112 @@ def sim2state(robot,state):
 
     pose=robot.GetDOFValues() # gets the current state
     # Get current state from simulation
-    state.joint[ha.RSP].pos = pose[ind('RSP')]
-    state.joint[ha.RSR].pos = pose[ind('RSR')]
-    state.joint[ha.RSY].pos = pose[ind('RSY')]
-    state.joint[ha.REB].pos = pose[ind('REP')]
-    state.joint[ha.RWY].pos = pose[ind('RWY')]
-    state.joint[ha.RWP].pos = pose[ind('RWP')]
+    for k,v in ha_from_oh_map.items():
+        state.joint[v].pos = pose[k]
 
-    state.joint[ha.LSP].pos = pose[ind('LSP')]
-    state.joint[ha.LSR].pos = pose[ind('LSR')]
-    state.joint[ha.LSY].pos = pose[ind('LSY')]
-    state.joint[ha.LEB].pos = pose[ind('LEP')]
-    state.joint[ha.LWY].pos = pose[ind('LWY')]
-    state.joint[ha.LWP].pos = pose[ind('LWP')]
+    #state.joint[ha.RSP].pos = pose[ind('RSP')]
+    #state.joint[ha.RSR].pos = pose[ind('RSR')]
+    #state.joint[ha.RSY].pos = pose[ind('RSY')]
+    #state.joint[ha.REB].pos = pose[ind('REP')]
+    #state.joint[ha.RWY].pos = pose[ind('RWY')]
+    #state.joint[ha.RWP].pos = pose[ind('RWP')]
 
-    state.joint[ha.WST].pos = pose[ind('HPY')]
+    #state.joint[ha.LSP].pos = pose[ind('LSP')]
+    #state.joint[ha.LSR].pos = pose[ind('LSR')]
+    #state.joint[ha.LSY].pos = pose[ind('LSY')]
+    #state.joint[ha.LEB].pos = pose[ind('LEP')]
+    #state.joint[ha.LWY].pos = pose[ind('LWY')]
+    #state.joint[ha.LWP].pos = pose[ind('LWP')]
 
-    state.joint[ha.RHY].pos = pose[ind('RHY')]
-    state.joint[ha.RHR].pos = pose[ind('RHR')]
-    state.joint[ha.RHP].pos = pose[ind('RHP')]
-    state.joint[ha.RKN].pos = pose[ind('RKP')]
-    state.joint[ha.RAP].pos = pose[ind('RAP')]
-    state.joint[ha.RAR].pos = pose[ind('RAR')]
+    #state.joint[ha.WST].pos = pose[ind('HPY')]
 
-    state.joint[ha.LHY].pos = pose[ind('LHY')]
-    state.joint[ha.LHR].pos = pose[ind('LHR')]
-    state.joint[ha.LHP].pos = pose[ind('LHP')]
-    state.joint[ha.LKN].pos = pose[ind('LKP')]
-    state.joint[ha.LAP].pos = pose[ind('LAP')]
-    state.joint[ha.LAR].pos = pose[ind('LAR')]
+    #state.joint[ha.RHY].pos = pose[ind('RHY')]
+    #state.joint[ha.RHR].pos = pose[ind('RHR')]
+    #state.joint[ha.RHP].pos = pose[ind('RHP')]
+    #state.joint[ha.RKN].pos = pose[ind('RKP')]
+    #state.joint[ha.RAP].pos = pose[ind('RAP')]
+    #state.joint[ha.RAR].pos = pose[ind('RAR')]
+
+    #state.joint[ha.LHY].pos = pose[ind('LHY')]
+    #state.joint[ha.LHR].pos = pose[ind('LHR')]
+    #state.joint[ha.LHP].pos = pose[ind('LHP')]
+    #state.joint[ha.LKN].pos = pose[ind('LKP')]
+    #state.joint[ha.LAP].pos = pose[ind('LAP')]
+    #state.joint[ha.LAR].pos = pose[ind('LAR')]
 
     return pose
 
 def pos2robot(robot, state):
     # Sets the CMD reference to the robot
     pose=robot.GetDOFValues() # gets the current state
-    pose[ind('RSP')] = state.joint[ha.RSP].pos
-    pose[ind('RSR')] = state.joint[ha.RSR].pos
-    pose[ind('RSY')] = state.joint[ha.RSY].pos
-    pose[ind('REP')] = state.joint[ha.REB].pos
-    pose[ind('RWY')] = state.joint[ha.RWY].pos
-    pose[ind('RWP')] = state.joint[ha.RWP].pos
+    for k,v in oh_from_ha_map.items():
+        pose[v]=state.joint[k].pos
+    #pose[ind('RSP')] = state.joint[ha.RSP].pos
+    #pose[ind('RSR')] = state.joint[ha.RSR].pos
+    #pose[ind('RSY')] = state.joint[ha.RSY].pos
+    #pose[ind('REP')] = state.joint[ha.REB].pos
+    #pose[ind('RWY')] = state.joint[ha.RWY].pos
+    #pose[ind('RWP')] = state.joint[ha.RWP].pos
 
-    pose[ind('LSP')] = state.joint[ha.LSP].pos
-    pose[ind('LSR')] = state.joint[ha.LSR].pos
-    pose[ind('LSY')] = state.joint[ha.LSY].pos
-    pose[ind('LEP')] = state.joint[ha.LEB].pos
-    pose[ind('LWY')] = state.joint[ha.LWY].pos
-    pose[ind('LWP')] = state.joint[ha.LWP].pos
+    #pose[ind('LSP')] = state.joint[ha.LSP].pos
+    #pose[ind('LSR')] = state.joint[ha.LSR].pos
+    #pose[ind('LSY')] = state.joint[ha.LSY].pos
+    #pose[ind('LEP')] = state.joint[ha.LEB].pos
+    #pose[ind('LWY')] = state.joint[ha.LWY].pos
+    #pose[ind('LWP')] = state.joint[ha.LWP].pos
 
-    pose[ind('HPY')] = state.joint[ha.WST].pos
+    #pose[ind('HPY')] = state.joint[ha.WST].pos
 
-    pose[ind('RHY')] = state.joint[ha.RHY].pos
-    pose[ind('RHR')] = state.joint[ha.RHR].pos
-    pose[ind('RHP')] = state.joint[ha.RHP].pos
-    pose[ind('RKP')] = state.joint[ha.RKN].pos
-    pose[ind('RAP')] = state.joint[ha.RAP].pos
-    pose[ind('RAR')] = state.joint[ha.RAR].pos
+    #pose[ind('RHY')] = state.joint[ha.RHY].pos
+    #pose[ind('RHR')] = state.joint[ha.RHR].pos
+    #pose[ind('RHP')] = state.joint[ha.RHP].pos
+    #pose[ind('RKP')] = state.joint[ha.RKN].pos
+    #pose[ind('RAP')] = state.joint[ha.RAP].pos
+    #pose[ind('RAR')] = state.joint[ha.RAR].pos
 
-    pose[ind('LHY')] = state.joint[ha.LHY].pos
-    pose[ind('LHR')] = state.joint[ha.LHR].pos
-    pose[ind('LHP')] = state.joint[ha.LHP].pos
-    pose[ind('LKP')] = state.joint[ha.LKN].pos
-    pose[ind('LAP')] = state.joint[ha.LAP].pos
-    pose[ind('LAR')] = state.joint[ha.LAR].pos
+    #pose[ind('LHY')] = state.joint[ha.LHY].pos
+    #pose[ind('LHR')] = state.joint[ha.LHR].pos
+    #pose[ind('LHP')] = state.joint[ha.LHP].pos
+    #pose[ind('LKP')] = state.joint[ha.LKN].pos
+    #pose[ind('LAP')] = state.joint[ha.LAP].pos
+    #pose[ind('LAR')] = state.joint[ha.LAR].pos
 
     return pose
 
 def ref2robot(robot, state):
     # Sets the CMD reference to the robot
     pose=robot.GetDOFValues() # gets the current state
-    pose[ind('RSP')] = state.joint[ha.RSP].ref
-    pose[ind('RSR')] = state.joint[ha.RSR].ref
-    pose[ind('RSY')] = state.joint[ha.RSY].ref
-    pose[ind('REP')] = state.joint[ha.REB].ref
-    pose[ind('RWY')] = state.joint[ha.RWY].ref
-    pose[ind('RWP')] = state.joint[ha.RWP].ref
+    for k,v in oh_from_ha_map.items():
+        pose[v]=state.joint[k].ref
+    #pose[ind('RSP')] = state.joint[ha.RSP].ref
+    #pose[ind('RSR')] = state.joint[ha.RSR].ref
+    #pose[ind('RSY')] = state.joint[ha.RSY].ref
+    #pose[ind('REP')] = state.joint[ha.REB].ref
+    #pose[ind('RWY')] = state.joint[ha.RWY].ref
+    #pose[ind('RWP')] = state.joint[ha.RWP].ref
 
-    pose[ind('LSP')] = state.joint[ha.LSP].ref
-    pose[ind('LSR')] = state.joint[ha.LSR].ref
-    pose[ind('LSY')] = state.joint[ha.LSY].ref
-    pose[ind('LEP')] = state.joint[ha.LEB].ref
-    pose[ind('LWY')] = state.joint[ha.LWY].ref
-    pose[ind('LWP')] = state.joint[ha.LWP].ref
+    #pose[ind('LSP')] = state.joint[ha.LSP].ref
+    #pose[ind('LSR')] = state.joint[ha.LSR].ref
+    #pose[ind('LSY')] = state.joint[ha.LSY].ref
+    #pose[ind('LEP')] = state.joint[ha.LEB].ref
+    #pose[ind('LWY')] = state.joint[ha.LWY].ref
+    #pose[ind('LWP')] = state.joint[ha.LWP].ref
 
-    pose[ind('HPY')] = state.joint[ha.WST].ref
+    #pose[ind('HPY')] = state.joint[ha.WST].ref
 
-    pose[ind('RHY')] = state.joint[ha.RHY].ref
-    pose[ind('RHR')] = state.joint[ha.RHR].ref
-    pose[ind('RHP')] = state.joint[ha.RHP].ref
-    pose[ind('RKP')] = state.joint[ha.RKN].ref
-    pose[ind('RAP')] = state.joint[ha.RAP].ref
-    pose[ind('RAR')] = state.joint[ha.RAR].ref
+    #pose[ind('RHY')] = state.joint[ha.RHY].ref
+    #pose[ind('RHR')] = state.joint[ha.RHR].ref
+    #pose[ind('RHP')] = state.joint[ha.RHP].ref
+    #pose[ind('RKP')] = state.joint[ha.RKN].ref
+    #pose[ind('RAP')] = state.joint[ha.RAP].ref
+    #pose[ind('RAR')] = state.joint[ha.RAR].ref
 
-    pose[ind('LHY')] = state.joint[ha.LHY].ref
-    pose[ind('LHR')] = state.joint[ha.LHR].ref
-    pose[ind('LHP')] = state.joint[ha.LHP].ref
-    pose[ind('LKP')] = state.joint[ha.LKN].ref
-    pose[ind('LAP')] = state.joint[ha.LAP].ref
-    pose[ind('LAR')] = state.joint[ha.LAR].ref
+    #pose[ind('LHY')] = state.joint[ha.LHY].ref
+    #pose[ind('LHR')] = state.joint[ha.LHR].ref
+    #pose[ind('LHP')] = state.joint[ha.LHP].ref
+    #pose[ind('LKP')] = state.joint[ha.LKN].ref
+    #pose[ind('LAP')] = state.joint[ha.LAP].ref
+    #pose[ind('LAR')] = state.joint[ha.LAR].ref
 
     return pose
 
@@ -206,6 +251,8 @@ if __name__=='__main__':
     fs.put(sim)
     steps=1000
     # sloppy globals
+
+    (ha_from_oh_map,oh_from_ha_map) = make_maps(robot)
 
     pr.enable()
     if openhubo.check_physics(env):
