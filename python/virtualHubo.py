@@ -73,22 +73,27 @@ def make_maps(robot):
     return (ha_from_oh,oh_from_ha)
 
 class StatusReporter:
-    def __init__(self, name=None,waittime=2.0):
-        self.name = name
-        self.tstart = time.time()
-        self.waittime=waittime
+    def __init__(self, env,skip=10):
+        self.env=env
+        self.tinit = time.time()
+        self.tstart = self.tinit
+        self.tsim_start=env.GetSimulationTime()
+        self.skip=skip
         self.count=0
 
     def update(self):
         self.count+=1
-        t=time.time()
-        dt=t - self.tstart
-        if dt>=self.waittime:
-            update_rate=ha.HUBO_LOOP_PERIOD*self.count/dt
-            print 'Elapsed: {0} sec, {1:0.2f} percent of realtime'.format(
-                dt,update_rate * 100.)
-            self.count=0
+        if self.count>=self.skip:
+            t=time.time()
+            dt=t - self.tstart
             self.tstart=t
+            dt_sim=(self.env.GetSimulationTime()-self.tsim_start)/1000000.0
+            self.tsim_start=self.env.GetSimulationTime()
+
+            update_rate=dt_sim/dt
+            print 't: {0:0.3f} sec, dt_sim: {1:0.3f} sec, {2:0.2f}% of realtime'.format(t-self.tinit,
+                dt_sim,update_rate * 100.)
+            self.count=0
 
 
 def sim2state(robot,state):
@@ -120,24 +125,52 @@ def ref2robot(robot, state):
 
     return pose
 
-if __name__=='__main__':
-    import cProfile, openhubo.startup
-    pr = cProfile.Profile()
+def init_message(env,options):
+    msg=['Starting simulation']
 
+    if options.simtime:
+        msg.append('Sim-timed mode')
+    else:
+        msg.append('WARNING: Realtime mode')
+
+    if openhubo.check_physics(env):
+        msg.append('Physics enabled')
+    else:
+        msg.append('Physics disabled')
+
+    print ', '.join(msg)
+
+def step_simulation(env,dt):
+    """Trick to get yappi to profile external functions."""
+    env.StepSimulation(dt)
+    #if not openhubo.check_physics(env):
+        #time.sleep(dt)
+
+
+if __name__=='__main__':
+    #Import a few libraries that are helpful for profiling
+    import yappi, openhubo.startup
+
+    #Parse command line options, including physics and simtime flags.
     parser = OptionParser()
-    parser.add_option("-s","--simtime", action="store_true",
-                      dest="simetime", default=False,
-                      help="Use Sim time instead of realtime")
+    parser.set_defaults(simtime=True)
+    parser.add_option("-s","--realtime", action="store_false",
+                      dest="simtime",
+                      help="Run simulation in realtime mode (not recommended unless you have a FAST machine)")
     (env,options)=openhubo.setup('qtcoin',True,parser)
-    env.SetDebugLevel(4)
-    time.sleep(.25)
+
+    #Force enable the ghost robot to show ref vs. pos
+    env.SetDebugLevel(3)
     options.ghost=True
 
-    [robot,ctrl,ind,ghost,recorder]=openhubo.load_scene(env,options)
+    #Profiling stuff to see python performance
+    if options.profile:
+        steps=1000
+        yappi.start()
+    else:
+        steps=inf
 
-    if not options.stop:
-        env.StartSimulation(openhubo.TIMESTEP)
-        time.sleep(.5)
+    [robot,ctrl,ind,ghost,recorder]=openhubo.load_scene(env,options)
 
     # Hubo-Ach Start and setup:
     s = ach.Channel(ha.HUBO_CHAN_STATE_NAME)
@@ -151,56 +184,78 @@ if __name__=='__main__':
     fs = ach.Channel(ha.HUBO_CHAN_VIRTUAL_FROM_SIM_NAME)
     fs.flush()
 
-    print('Starting Sim')
+    init_message(env,options)
 
-    fs.put(sim)
-
-    if options.profile:
-        steps=1000
-        pr.enable()
-    else:
-        #FIXME: swap to while true?
-        steps=1000000
-
-    # sloppy globals
+    # Make global mapping functions between hubo-ach (ha) and openhubo (oh)
     (ha_from_oh_map,oh_from_ha_map) = make_maps(robot)
 
-    pr.enable()
+    #Initialization
+    k=0
+    t=time.time()
+    #Define a "reporter" that prints status messages every X updates
+    reporter=StatusReporter(env,50)
 
-    reporter=StatusReporter('Virtual Hubo',2.0)
-
-    N = max(_np.ceil(ha.HUBO_LOOP_PERIOD/openhubo.TIMESTEP),1)
-
-    for k in xrange(steps):
-        #Use status reporter to print status messages
-        reporter.update()
-
-        #Update, waiting for simulation to complete
-        [status, framesizes] = ts.get(sim, wait=True, last=False)
-        [status, framesizes] = s.get(state, wait=False, last=True)
-
-        ref_pose = ref2robot(robot, state)
-
-        if openhubo.check_physics(env):
-            ctrl.SetDesired(ref_pose)   # sends to robot
-        else:
-            ghost.SetDOFValues(ref_pose)
-            state_pose = pos2robot(robot, state)
-            ctrl.SetDesired(state_pose)   # Directly copy robot state over
-
-        #Loop at openHubo timestep N times to get a total delta_t of HUBO_LOOP_PERIOD
-        for x in xrange(int(N)):
-            env.StepSimulation(openhubo.TIMESTEP)
-
-        #Update ach channels with new time and pose data
-        sim.time = sim.time + N*openhubo.TIMESTEP
-        state_pose = sim2state(robot,state)
-        s.put(state)
+    if options.simtime:
         fs.put(sim)
-        #time.sleep(0.001)  # sleep to allow for keyboard input
+        while k<steps:
+            [status, framesizes] = ts.get(sim, wait=True, last=False)
+            [status, framesizes] = s.get(state, wait=False, last=True)
+            #Update, waiting for simulation to complete
+
+            ref_pose = ref2robot(robot, state)
+
+            if openhubo.check_physics(env):
+                #Ghost is updated internally
+                ctrl.SetDesired(ref_pose)   # sends to robot
+            else:
+                #No physics, ghost is updated explicitly
+                ghost.SetDOFValues(ref_pose)
+                state_pose = pos2robot(robot, state)
+                ctrl.SetDesired(state_pose)   # Directly copy state (idealcontroller)
+
+            #Loop at openHubo timestep N times to get a total delta_t of HUBO_LOOP_PERIOD
+            N = max(_np.ceil(ha.HUBO_LOOP_PERIOD/openhubo.TIMESTEP),1)
+            for x in range(int(N)):
+                #Profiling trick, below is equivalent to env.StartSimulation(...)
+                step_simulation(env,openhubo.TIMESTEP)
+
+            #Update ach channels with new time and pose data
+            state_pose = sim2state(robot,state)
+            s.put(state)
+            sim.time += N*openhubo.TIMESTEP
+            fs.put(sim)
+
+            #Update misc stuff
+            reporter.update()
+            k+=1
+    else:
+        #WARNING: "Realtime" mode is only as realtime as the code below, that is to say, not very!
+        env.StartSimulation(openhubo.TIMESTEP,True)
+        while k<steps:
+            k+=1
+            reporter.update()
+
+            [status, framesizes] = s.get(state, wait=False, last=False)
+
+            ref_pose = ref2robot(robot, state)
+
+            if openhubo.check_physics(env):
+                #Ghost is updated internally
+                ctrl.SetDesired(ref_pose)   # sends to robot
+            else:
+                #No physics, ghost is updated explicitly
+                ghost.SetDOFValues(ref_pose)
+                state_pose = pos2robot(robot, state)
+                ctrl.SetDesired(state_pose)   # Directly copy state (idealcontroller)
+
+            state_pose = sim2state(robot,state)
+            s.put(state)
+
+            #Pause loop to wait for next
+            t1=time.time()
+            pause_time=max(ha.HUBO_LOOP_PERIOD-(t1-t),0)
+            time.sleep(pause_time)
+            t=t1
 
     if options.profile:
-        pr.disable()
-        pr.print_stats('time')
-    pr.disable()
-    pr.print_stats('time')
+        yappi.print_stats()
