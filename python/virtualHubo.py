@@ -29,10 +29,9 @@ from optparse import OptionParser
 from numpy import pi, array
 import numpy as _np
 import openhubo
-import openhubo.check_physics as physics
 
 skip = 100
-skipi = 0
+kipi = 0
 skiptemp = 0.0
 
 
@@ -165,12 +164,14 @@ def ref2robot(robot, state):
     return pose
 
 if __name__=='__main__':
+    import cProfile, openhubo.startup
+    pr = cProfile.Profile()
 
     """Option parsing for hubo-ach sim mode"""
     parser = OptionParser()
-    parser.add_option("-s","simtime",
-        action="store_true", dest="verbose", default=False,
-        help="Use Sim time instead of realtime")
+    parser.add_option("-s","--simtime", action="store_true",
+                      dest="simetime", default=False,
+                      help="Use Sim time instead of realtime")
 
     (env,options)=openhubo.setup('qtcoin',True,parser)
     env.SetDebugLevel(4)
@@ -195,51 +196,38 @@ if __name__=='__main__':
     fs = ach.Channel(ha.HUBO_CHAN_VIRTUAL_FROM_SIM_NAME)
     fs.flush()
 
-# start edit here
-#    print('Press ENTER to start sim')
-#    tmp = raw_input()
-#    print tmp
+    # start edit here
+    #    print('Press ENTER to start sim')
+    #    tmp = raw_input()
+    #    print tmp
 
     print('Starting Sim')
 
     fs.put(sim)
+    steps=1000
+    # sloppy globals
 
-    while True:
-        with Timer('Get_Pose'):
+    pr.enable()
+    if openhubo.check_physics(env):
+        for k in xrange(steps):
+            #with Timer('Get_Pose'):
+            [status, framesizes] = ts.get(sim, wait=True, last=False)
+            [status, framesizes] = s.get(state, wait=False, last=True)
 
-        if physics(env) or options.simtime:
-            [statuss, framesizes] = ts.get(sim, wait=True, last=False)
-
-        [statuss, framesizes] = s.get(state, wait=False, last=True)
-
-        if physics(env):
-            # Set Reference from simulation
             pose = ref2robot(robot, state)
             ctrl.SetDesired(pose)   # sends to robot
-        else:
-            pose = ref2robot(ref, state)
-            ref.SetDOFValues(pose)
-            pose = pos2robot(robot, state)
-            robot.SetDOFValues(pose)
-            #            pose = ref2robot(robot, state)
 
-
-    # this will step the simulation  note: i can run env step in a loop if nothign else changes
-
-        if physics(env) or options.simtime:
             N = _np.ceil(ha.HUBO_LOOP_PERIOD/openhubo.TIMESTEP)
             T = 1/N*ha.HUBO_LOOP_PERIOD
-            #        print 'openhubo.TIMESTEP = ',openhubo.TIMESTEP, ' : N = ', N, ' : T = ', T
+            #print 'openhubo.TIMESTEP = ',openhubo.TIMESTEP, ' : N = ', N, ' : T = ', T
             for x in xrange(int(N)):
                 env.StepSimulation(openhubo.TIMESTEP)  # this is in seconds
                 sim.time = sim.time + openhubo.TIMESTEP
-                if physics(env):
-                    pose = sim2state(robot,state)
-                    s.put(state)
-                    fs.put(sim)
-                else:
-                    env.StepSimulation(openhubo.TIMESTEP)  # this is in seconds
-                    # put the current state
+                pose = sim2state(robot,state)
+                s.put(state)
+                fs.put(sim)
 
-        time.sleep(0.001)  # sleep to allow for keyboard input
+            time.sleep(0.001)  # sleep to allow for keyboard input
 
+    pr.disable()
+    pr.print_stats('time')
