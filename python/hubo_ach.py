@@ -14,7 +14,7 @@
 #     * Neither the name of the author nor the names of its contributors may
 #       be used to endorse or promote products derived from this software
 #       without specific prior written permission.
-# 
+#
 # THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
 # ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
 # WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
@@ -43,11 +43,11 @@ HUBO_IMU2	  = 6 # Index of IMU2
 HUBO_JOINT_COUNT                  = 42
 HUBO_JMC_COUNT                    = 0x26
 HUBO_IMU_COUNT                    = 3
-HUBO_CHAN_REF_NAME                = 'hubo-ref'        
+HUBO_CHAN_REF_NAME                = 'hubo-ref'
 HUBO_CHAN_BOARD_CMD_NAME          = 'hubo-board-cmd'
-HUBO_CHAN_STATE_NAME              = 'hubo-state'     
-HUBO_CHAN_VIRTUAL_TO_SIM_NAME     = 'hubo-virtual-to-sim'     
-HUBO_CHAN_VIRTUAL_FROM_SIM_NAME   = 'hubo-virtual-from-sim'     
+HUBO_CHAN_STATE_NAME              = 'hubo-state'
+HUBO_CHAN_VIRTUAL_TO_SIM_NAME     = 'hubo-virtual-to-sim'
+HUBO_CHAN_VIRTUAL_FROM_SIM_NAME   = 'hubo-virtual-from-sim'
 HUBO_LOOP_PERIOD                  = 0.005
 
 RHY = 26# Right Hip Yaw
@@ -114,14 +114,14 @@ class HUBO_JOINT_PARAM(Structure):
     _pack_ = 1
     _fields_ = [("refEnc"   , c_uint32),
                 ("motNo"    , c_uint16),
-                ("jntNo"    , c_uint16), 
-                ("drive"    , c_uint16), 
-                ("driven"   , c_uint16), 
-                ("harmonic" , c_uint16), 
-                ("enc"      , c_uint16), 
-                ("jmc"      , c_uint16), 
-                ("dir"      , c_ubyte), 
-                ("can"      , c_ubyte), 
+                ("jntNo"    , c_uint16),
+                ("drive"    , c_uint16),
+                ("driven"   , c_uint16),
+                ("harmonic" , c_uint16),
+                ("enc"      , c_uint16),
+                ("jmc"      , c_uint16),
+                ("dir"      , c_ubyte),
+                ("can"      , c_ubyte),
                 ("numMot"   , c_ubyte),
                 ("name"     , c_ubyte*4)]
 

@@ -26,7 +26,7 @@ from optparse import OptionParser
 #import select
 
 #from openravepy import *
-from numpy import pi
+from numpy import pi,inf
 import numpy as _np
 import openhubo
 
@@ -72,139 +72,51 @@ def make_maps(robot):
     oh_from_ha = {v:k for k, v in ha_from_oh.items()}
     return (ha_from_oh,oh_from_ha)
 
-
-class Timer(object):
-    def __init__(self, name=None):
+class StatusReporter:
+    def __init__(self, name=None,waittime=2.0):
         self.name = name
-
-    def __enter__(self):
         self.tstart = time.time()
+        self.waittime=waittime
+        self.count=0
 
-    def __exit__(self, type, value, traceback):
-        global skip
-        global skipi
-        global skiptemp
-        skiptemp = skiptemp + (time.time() - self.tstart)
-        if (skipi < skip):
-            skipi = skipi + 1
-        else:
-            skiptemp = skiptemp/100.0
-            if self.name:
-                print '[%s]' % self.name,
-           # print 'Elapsed: %s' % (time.time() - self.tstart)
-            print 'Elapsed: ',skiptemp,' sec : ', (ha.HUBO_LOOP_PERIOD/skiptemp * 100.0),' percent'
-            skipi = 0
+    def update(self):
+        self.count+=1
+        t=time.time()
+        dt=t - self.tstart
+        if dt>=self.waittime:
+            update_rate=ha.HUBO_LOOP_PERIOD*self.count/dt
+            print 'Elapsed: {0} sec, {1:0.2f} percent of realtime'.format(
+                dt,update_rate * 100.)
+            self.count=0
+            self.tstart=t
+
 
 def sim2state(robot,state):
+    """Iterate over all robot DOF and copy the values to the appropriate
+    hubo-ach joint."""
 
     pose=robot.GetDOFValues() # gets the current state
-    # Get current state from simulation
+
     for k,v in ha_from_oh_map.items():
         state.joint[v].pos = pose[k]
-
-    #state.joint[ha.RSP].pos = pose[ind('RSP')]
-    #state.joint[ha.RSR].pos = pose[ind('RSR')]
-    #state.joint[ha.RSY].pos = pose[ind('RSY')]
-    #state.joint[ha.REB].pos = pose[ind('REP')]
-    #state.joint[ha.RWY].pos = pose[ind('RWY')]
-    #state.joint[ha.RWP].pos = pose[ind('RWP')]
-
-    #state.joint[ha.LSP].pos = pose[ind('LSP')]
-    #state.joint[ha.LSR].pos = pose[ind('LSR')]
-    #state.joint[ha.LSY].pos = pose[ind('LSY')]
-    #state.joint[ha.LEB].pos = pose[ind('LEP')]
-    #state.joint[ha.LWY].pos = pose[ind('LWY')]
-    #state.joint[ha.LWP].pos = pose[ind('LWP')]
-
-    #state.joint[ha.WST].pos = pose[ind('HPY')]
-
-    #state.joint[ha.RHY].pos = pose[ind('RHY')]
-    #state.joint[ha.RHR].pos = pose[ind('RHR')]
-    #state.joint[ha.RHP].pos = pose[ind('RHP')]
-    #state.joint[ha.RKN].pos = pose[ind('RKP')]
-    #state.joint[ha.RAP].pos = pose[ind('RAP')]
-    #state.joint[ha.RAR].pos = pose[ind('RAR')]
-
-    #state.joint[ha.LHY].pos = pose[ind('LHY')]
-    #state.joint[ha.LHR].pos = pose[ind('LHR')]
-    #state.joint[ha.LHP].pos = pose[ind('LHP')]
-    #state.joint[ha.LKN].pos = pose[ind('LKP')]
-    #state.joint[ha.LAP].pos = pose[ind('LAP')]
-    #state.joint[ha.LAR].pos = pose[ind('LAR')]
 
     return pose
 
 def pos2robot(robot, state):
-    # Sets the CMD reference to the robot
+    """Iterate over all hubo-ach joints and copy the "pos" field to a robot
+    pose vector"""
+
     pose=robot.GetDOFValues() # gets the current state
     for k,v in oh_from_ha_map.items():
         pose[v]=state.joint[k].pos
-    #pose[ind('RSP')] = state.joint[ha.RSP].pos
-    #pose[ind('RSR')] = state.joint[ha.RSR].pos
-    #pose[ind('RSY')] = state.joint[ha.RSY].pos
-    #pose[ind('REP')] = state.joint[ha.REB].pos
-    #pose[ind('RWY')] = state.joint[ha.RWY].pos
-    #pose[ind('RWP')] = state.joint[ha.RWP].pos
-
-    #pose[ind('LSP')] = state.joint[ha.LSP].pos
-    #pose[ind('LSR')] = state.joint[ha.LSR].pos
-    #pose[ind('LSY')] = state.joint[ha.LSY].pos
-    #pose[ind('LEP')] = state.joint[ha.LEB].pos
-    #pose[ind('LWY')] = state.joint[ha.LWY].pos
-    #pose[ind('LWP')] = state.joint[ha.LWP].pos
-
-    #pose[ind('HPY')] = state.joint[ha.WST].pos
-
-    #pose[ind('RHY')] = state.joint[ha.RHY].pos
-    #pose[ind('RHR')] = state.joint[ha.RHR].pos
-    #pose[ind('RHP')] = state.joint[ha.RHP].pos
-    #pose[ind('RKP')] = state.joint[ha.RKN].pos
-    #pose[ind('RAP')] = state.joint[ha.RAP].pos
-    #pose[ind('RAR')] = state.joint[ha.RAR].pos
-
-    #pose[ind('LHY')] = state.joint[ha.LHY].pos
-    #pose[ind('LHR')] = state.joint[ha.LHR].pos
-    #pose[ind('LHP')] = state.joint[ha.LHP].pos
-    #pose[ind('LKP')] = state.joint[ha.LKN].pos
-    #pose[ind('LAP')] = state.joint[ha.LAP].pos
-    #pose[ind('LAR')] = state.joint[ha.LAR].pos
-
     return pose
 
 def ref2robot(robot, state):
-    # Sets the CMD reference to the robot
+    """Iterate over all refs and copy from the state to a robot pose vector"""
+
     pose=robot.GetDOFValues() # gets the current state
     for k,v in oh_from_ha_map.items():
         pose[v]=state.joint[k].ref
-    #pose[ind('RSP')] = state.joint[ha.RSP].ref
-    #pose[ind('RSR')] = state.joint[ha.RSR].ref
-    #pose[ind('RSY')] = state.joint[ha.RSY].ref
-    #pose[ind('REP')] = state.joint[ha.REB].ref
-    #pose[ind('RWY')] = state.joint[ha.RWY].ref
-    #pose[ind('RWP')] = state.joint[ha.RWP].ref
-
-    #pose[ind('LSP')] = state.joint[ha.LSP].ref
-    #pose[ind('LSR')] = state.joint[ha.LSR].ref
-    #pose[ind('LSY')] = state.joint[ha.LSY].ref
-    #pose[ind('LEP')] = state.joint[ha.LEB].ref
-    #pose[ind('LWY')] = state.joint[ha.LWY].ref
-    #pose[ind('LWP')] = state.joint[ha.LWP].ref
-
-    #pose[ind('HPY')] = state.joint[ha.WST].ref
-
-    #pose[ind('RHY')] = state.joint[ha.RHY].ref
-    #pose[ind('RHR')] = state.joint[ha.RHR].ref
-    #pose[ind('RHP')] = state.joint[ha.RHP].ref
-    #pose[ind('RKP')] = state.joint[ha.RKN].ref
-    #pose[ind('RAP')] = state.joint[ha.RAP].ref
-    #pose[ind('RAR')] = state.joint[ha.RAR].ref
-
-    #pose[ind('LHY')] = state.joint[ha.LHY].ref
-    #pose[ind('LHR')] = state.joint[ha.LHR].ref
-    #pose[ind('LHP')] = state.joint[ha.LHP].ref
-    #pose[ind('LKP')] = state.joint[ha.LKN].ref
-    #pose[ind('LAP')] = state.joint[ha.LAP].ref
-    #pose[ind('LAR')] = state.joint[ha.LAR].ref
 
     return pose
 
@@ -212,18 +124,16 @@ if __name__=='__main__':
     import cProfile, openhubo.startup
     pr = cProfile.Profile()
 
-    """Option parsing for hubo-ach sim mode"""
     parser = OptionParser()
     parser.add_option("-s","--simtime", action="store_true",
                       dest="simetime", default=False,
                       help="Use Sim time instead of realtime")
-
     (env,options)=openhubo.setup('qtcoin',True,parser)
     env.SetDebugLevel(4)
     time.sleep(.25)
     options.ghost=True
 
-    [robot,ctrl,ind,ref,recorder]=openhubo.load_scene(env,options)
+    [robot,ctrl,ind,ghost,recorder]=openhubo.load_scene(env,options)
 
     if not options.stop:
         env.StartSimulation(openhubo.TIMESTEP)
@@ -241,40 +151,56 @@ if __name__=='__main__':
     fs = ach.Channel(ha.HUBO_CHAN_VIRTUAL_FROM_SIM_NAME)
     fs.flush()
 
-    # start edit here
-    #    print('Press ENTER to start sim')
-    #    tmp = raw_input()
-    #    print tmp
-
     print('Starting Sim')
 
     fs.put(sim)
-    steps=1000
-    # sloppy globals
 
+    if options.profile:
+        steps=1000
+        pr.enable()
+    else:
+        #FIXME: swap to while true?
+        steps=1000000
+
+    # sloppy globals
     (ha_from_oh_map,oh_from_ha_map) = make_maps(robot)
 
     pr.enable()
-    if openhubo.check_physics(env):
-        for k in xrange(steps):
-            #with Timer('Get_Pose'):
-            [status, framesizes] = ts.get(sim, wait=True, last=False)
-            [status, framesizes] = s.get(state, wait=False, last=True)
 
-            pose = ref2robot(robot, state)
-            ctrl.SetDesired(pose)   # sends to robot
+    reporter=StatusReporter('Virtual Hubo',2.0)
 
-            N = _np.ceil(ha.HUBO_LOOP_PERIOD/openhubo.TIMESTEP)
-            T = 1/N*ha.HUBO_LOOP_PERIOD
-            #print 'openhubo.TIMESTEP = ',openhubo.TIMESTEP, ' : N = ', N, ' : T = ', T
-            for x in xrange(int(N)):
-                env.StepSimulation(openhubo.TIMESTEP)  # this is in seconds
-                sim.time = sim.time + openhubo.TIMESTEP
-                pose = sim2state(robot,state)
-                s.put(state)
-                fs.put(sim)
+    N = max(_np.ceil(ha.HUBO_LOOP_PERIOD/openhubo.TIMESTEP),1)
 
-            time.sleep(0.001)  # sleep to allow for keyboard input
+    for k in xrange(steps):
+        #Use status reporter to print status messages
+        reporter.update()
 
+        #Update, waiting for simulation to complete
+        [status, framesizes] = ts.get(sim, wait=True, last=False)
+        [status, framesizes] = s.get(state, wait=False, last=True)
+
+        ref_pose = ref2robot(robot, state)
+
+        if openhubo.check_physics(env):
+            ctrl.SetDesired(ref_pose)   # sends to robot
+        else:
+            ghost.SetDOFValues(ref_pose)
+            state_pose = pos2robot(robot, state)
+            ctrl.SetDesired(state_pose)   # Directly copy robot state over
+
+        #Loop at openHubo timestep N times to get a total delta_t of HUBO_LOOP_PERIOD
+        for x in xrange(int(N)):
+            env.StepSimulation(openhubo.TIMESTEP)
+
+        #Update ach channels with new time and pose data
+        sim.time = sim.time + N*openhubo.TIMESTEP
+        state_pose = sim2state(robot,state)
+        s.put(state)
+        fs.put(sim)
+        #time.sleep(0.001)  # sleep to allow for keyboard input
+
+    if options.profile:
+        pr.disable()
+        pr.print_stats('time')
     pr.disable()
     pr.print_stats('time')
